@@ -2,6 +2,7 @@ package io.github.famuro.patientsystem.patient.service;
 
 import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
+import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.mapper.PatientMapper;
 import io.github.famuro.patientsystem.patient.model.Patient;
 import io.github.famuro.patientsystem.patient.repository.PatientRepository;
@@ -23,6 +24,11 @@ public class PatientService {
     }
 
     public PatientResponseDTO createPatient(PatientRequestDTO patientRequestDTO) {
+        // If an email exists, do not create a new patient
+        if (patientRepository.existsByEmail(patientRequestDTO.getEmail())) {
+            throw new EmailAlreadyExistsException("A patient with this email already exists");
+        }
+
         Patient newPatient = patientRepository.save(PatientMapper.toModel(patientRequestDTO));
 
         return PatientMapper.toDTO(newPatient);
