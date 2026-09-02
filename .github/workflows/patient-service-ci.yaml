@@ -1,0 +1,46 @@
+name: Patient Service CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "patient-service/**"
+      - ".github/workflows/patient-service-ci.yml"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "patient-service/**"
+      - ".github/workflows/patient-service-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: patient-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: patient-service/pom.xml
+
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build and run tests
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
