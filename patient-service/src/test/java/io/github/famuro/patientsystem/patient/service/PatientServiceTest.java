@@ -155,6 +155,91 @@ class PatientServiceTest {
     }
 
     @Test
+    void updatePatientReturnsUpdatedPatient() {
+        UUID id = UUID.randomUUID();
+        Patient patient = mock(Patient.class);
+
+        PatientRequestDTO request = createPatientRequest();
+
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+        when(patientRepository.existsByEmailAndIdNot(request.getEmail(), id)).thenReturn(false);
+        when(patientRepository.save(patient)).thenReturn(patient);
+
+        when(patient.getId()).thenReturn(id);
+        when(patient.getName()).thenReturn(request.getName());
+        when(patient.getEmail()).thenReturn(request.getEmail());
+        when(patient.getAddress()).thenReturn(request.getAddress());
+        when(patient.getDateOfBirth()).thenReturn(request.getDateOfBirth());
+
+        PatientResponseDTO result = patientService.updatePatient(id, request);
+
+        assertEquals(id.toString(), result.getId());
+        assertEquals(request.getName(), result.getName());
+        assertEquals(request.getEmail(), result.getEmail());
+        assertEquals(request.getAddress(), result.getAddress());
+        assertEquals(
+                request.getDateOfBirth().toString(),
+                result.getDateOfBirth()
+        );
+
+        verify(patientRepository).findById(id);
+        verify(patientRepository).existsByEmailAndIdNot(request.getEmail(), id);
+
+        verify(patient).setName(request.getName());
+        verify(patient).setEmail(request.getEmail());
+        verify(patient).setAddress(request.getAddress());
+        verify(patient).setDateOfBirth(request.getDateOfBirth());
+
+        verify(patientRepository).save(patient);
+    }
+
+    @Test
+    void updatePatientThrowsWhenPatientDoesNotExist() {
+        UUID id = UUID.randomUUID();
+        PatientRequestDTO request = createPatientRequest();
+
+        when(patientRepository.findById(id)).thenReturn(Optional.empty());
+
+        PatientNotFoundException exception = assertThrows(
+                PatientNotFoundException.class,
+                () -> patientService.updatePatient(id, request)
+        );
+
+        assertEquals(
+                "Patient not found with id " + id,
+                exception.getMessage()
+        );
+
+        verify(patientRepository).findById(id);
+        verify(patientRepository, never()).existsByEmailAndIdNot(anyString(), any(UUID.class));
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
+    void updatePatientThrowsWhenEmailBelongsToAnotherPatient() {
+        UUID id = UUID.randomUUID();
+        Patient patient = mock(Patient.class);
+        PatientRequestDTO request = createPatientRequest();
+
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+        when(patientRepository.existsByEmailAndIdNot(request.getEmail(), id)).thenReturn(true);
+
+        EmailAlreadyExistsException exception = assertThrows(
+                EmailAlreadyExistsException.class,
+                () -> patientService.updatePatient(id, request)
+        );
+
+        assertEquals(
+                "A patient with this email already exists",
+                exception.getMessage()
+        );
+
+        verify(patientRepository).findById(id);
+        verify(patientRepository).existsByEmailAndIdNot(request.getEmail(), id);
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
     void deletePatientByIdDeletesPatientWhenFound() {
         UUID id = UUID.randomUUID();
 

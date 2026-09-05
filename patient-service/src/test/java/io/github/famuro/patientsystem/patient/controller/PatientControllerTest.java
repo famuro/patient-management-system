@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(PatientController.class)
@@ -202,6 +204,103 @@ class PatientControllerTest {
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void updatePatientReturnsUpdatedPatient() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        PatientRequestDTO request = createPatientRequest();
+        PatientResponseDTO response = createPatientResponse();
+        response.setId(id.toString());
+
+        when(patientService.updatePatient(
+                eq(id),
+                any(PatientRequestDTO.class)
+        )).thenReturn(response);
+
+        mockMvc.perform(put("/patients/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.name").value(response.getName()))
+                .andExpect(jsonPath("$.email").value(response.getEmail()))
+                .andExpect(jsonPath("$.address").value(response.getAddress()))
+                .andExpect(jsonPath("$.dateOfBirth")
+                        .value(response.getDateOfBirth()));
+
+        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+    }
+
+    @Test
+    void updatePatientReturnsBadRequestForInvalidRequest() throws Exception {
+
+        UUID id = UUID.randomUUID();
+        PatientRequestDTO request = new PatientRequestDTO();
+
+        mockMvc.perform(put("/patients/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.name").value("Name is required"))
+                .andExpect(jsonPath("$.email").value("Email is required"))
+                .andExpect(jsonPath("$.address").value("Address is required"))
+                .andExpect(jsonPath("$.dateOfBirth").value("Date of birth is required"));
+
+        verifyNoInteractions(patientService);
+    }
+
+    @Test
+    void updatePatientReturnsNotFoundWhenPatientDoesNotExist() throws Exception {
+
+        UUID id = UUID.randomUUID();
+        PatientRequestDTO request = createPatientRequest();
+
+        when(patientService.updatePatient(
+                eq(id),
+                any(PatientRequestDTO.class)
+        )).thenThrow(new PatientNotFoundException("Patient not found with id " + id));
+
+        mockMvc.perform(put("/patients/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
+
+        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+    }
+
+    @Test
+    void updatePatientReturnsConflictWhenEmailBelongsToAnotherPatient() throws Exception {
+
+        UUID id = UUID.randomUUID();
+        PatientRequestDTO request = createPatientRequest();
+
+        when(patientService.updatePatient(
+                eq(id),
+                any(PatientRequestDTO.class)
+        )).thenThrow(new EmailAlreadyExistsException("A patient with this email already exists"));
+
+        mockMvc.perform(put("/patients/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+    }
+
+    @Test
+    void updatePatientReturnsBadRequestForInvalidUuid() throws Exception {
+
+        PatientRequestDTO request = createPatientRequest();
+
+        mockMvc.perform(put("/patients/{id}", "not-a-uuid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(patientService);
     }
 
     @Test
