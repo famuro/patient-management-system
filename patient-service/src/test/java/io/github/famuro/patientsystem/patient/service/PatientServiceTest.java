@@ -3,6 +3,7 @@ package io.github.famuro.patientsystem.patient.service;
 import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
+import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
 import io.github.famuro.patientsystem.patient.model.Patient;
 import io.github.famuro.patientsystem.patient.repository.PatientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +59,47 @@ class PatientServiceTest {
         assertEquals("1990-01-01", response.getDateOfBirth());
 
         verify(patientRepository).findAll();
+    }
+
+    @Test
+    void getPatientByIdReturnsPatientWhenFound() {
+        Patient patient = mock(Patient.class);
+
+        UUID id = UUID.randomUUID();
+
+        when(patient.getId()).thenReturn(id);
+        when(patient.getName()).thenReturn("Jon Snow");
+        when(patient.getEmail()).thenReturn("jon@example.com");
+        when(patient.getAddress()).thenReturn("21 Jump St");
+        when(patient.getDateOfBirth()).thenReturn(LocalDate.of(1990, 1, 1));
+
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+
+        PatientResponseDTO result = patientService.getPatientById(id);
+
+        assertEquals(id.toString(), result.getId());
+        assertEquals("Jon Snow", result.getName());
+        assertEquals("jon@example.com", result.getEmail());
+        assertEquals("21 Jump St", result.getAddress());
+        assertEquals("1990-01-01", result.getDateOfBirth());
+
+        verify(patientRepository).findById(id);
+    }
+
+    @Test
+    void getPatientByIdThrowsWhenPatientDoesNotExist() {
+        UUID id = UUID.randomUUID();
+
+        when(patientRepository.findById(id)).thenReturn(Optional.empty());
+
+        PatientNotFoundException exception = assertThrows(
+                PatientNotFoundException.class,
+                () -> patientService.getPatientById(id)
+        );
+
+        assertEquals("Patient not found with id " + id, exception.getMessage());
+
+        verify(patientRepository).findById(id);
     }
 
     @Test

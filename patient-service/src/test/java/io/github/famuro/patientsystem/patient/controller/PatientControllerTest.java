@@ -3,6 +3,7 @@ package io.github.famuro.patientsystem.patient.controller;
 import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
+import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
 import io.github.famuro.patientsystem.patient.service.PatientService;
 
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -57,6 +59,51 @@ class PatientControllerTest {
                 .andExpect(jsonPath("$[0].email").value(patient.getEmail()));
 
         verify(patientService).getPatients();
+    }
+
+    @Test
+    void getPatientByIdReturnsPatient() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        PatientResponseDTO response = createPatientResponse();
+        response.setId(id.toString());
+
+        when(patientService.getPatientById(id))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/patients/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(content()
+                        .contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.name").value(response.getName()))
+                .andExpect(jsonPath("$.email").value(response.getEmail()))
+                .andExpect(jsonPath("$.address").value(response.getAddress()))
+                .andExpect(jsonPath("$.dateOfBirth")
+                        .value(response.getDateOfBirth()));
+
+        verify(patientService).getPatientById(id);
+    }
+
+    @Test
+    void getPatientByIdReturnsNotFoundWhenPatientDoesNotExist() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        when(patientService.getPatientById(id))
+                .thenThrow(new PatientNotFoundException("Patient not found with id " + id));
+
+        mockMvc.perform(get("/patients/{id}", id))
+                .andExpect(status().isNotFound());
+
+        verify(patientService).getPatientById(id);
+    }
+
+    @Test
+    void getPatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
+        mockMvc.perform(get("/patients/{id}", "not-a-valid-uuid"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(patientService);
     }
 
     @Test
