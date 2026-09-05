@@ -29,6 +29,36 @@ class PatientRepositoryTest {
         assertFalse(patientRepository.existsByEmail("missing@example.com"));
     }
 
+    @Test
+    void existsByEmailAndIdNotReturnsTrueWhenAnotherPatientHasEmail() {
+        Patient firstPatient = createPatient("first@example.com");
+        Patient secondPatient = createPatient("second@example.com");
+
+        firstPatient = patientRepository.saveAndFlush(firstPatient);
+        secondPatient = patientRepository.saveAndFlush(secondPatient);
+
+        boolean exists = patientRepository.existsByEmailAndIdNot(
+                secondPatient.getEmail(),
+                firstPatient.getId()
+        );
+
+        assertTrue(exists);
+    }
+
+    @Test
+    void existsByEmailAndIdNotReturnsFalseWhenEmailBelongsToSamePatient() {
+        Patient patient = createPatient("patient@example.com");
+
+        patient = patientRepository.saveAndFlush(patient);
+
+        boolean exists = patientRepository.existsByEmailAndIdNot(
+                patient.getEmail(),
+                patient.getId()
+        );
+
+        assertFalse(exists);
+    }
+
     private Patient createPatient(String email) {
         Patient patient = new Patient();
         patient.setName("Jon Snow");
