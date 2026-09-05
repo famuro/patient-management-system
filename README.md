@@ -32,16 +32,27 @@ Planned communication patterns include:
 
 Each service will be designed to remain independently buildable, testable, and deployable.
 
-## Planned Technology Stack
+## Technology Stack
+Currently implemented:
 
-* Java
-* Spring Boot, Security, Cloud Gateway
-* Maven
-* Apache Kafka
-* gRPC
-* PostgreSQL
-* Docker
-* GitHub Actions
+- Java
+- Spring Boot
+- Spring Data JPA
+- Springdoc OpenAPI / Swagger UI
+- Maven
+- H2
+- JUnit
+- Mockito
+- GitHub Actions
+
+Planned as the system expands:
+
+- Spring Security
+- Spring Cloud Gateway
+- PostgreSQL
+- Docker
+- gRPC
+- Apache Kafka
 
 Additional infrastructure, observability, testing, and deployment tooling will be introduced as the project evolves.
 
@@ -63,11 +74,28 @@ patient-management-system/
 
 The repository structure will be expanded as services and supporting infrastructure are implemented.
 
+## API Documentation
+
+The Patient Service includes OpenAPI documentation generated with Springdoc.
+When the service is running locally, interactive API documentation is available through Swagger UI:
+```text
+localhost:4000/swagger-ui.html
+```
+or through Scalar:
+```text
+localhost:4000/scalar
+```
+The documentation includes the available patient endpoints, request operations, and API descriptions defined alongside the controller implementation. 
+OpenAPI annotations are maintained with the application code so that the API documentation evolves with the service.
+
 ## Development
 
-The project is currently under active development.
+The project is under active development.
 
-Setup and local development instructions will be added as the application infrastructure is introduced.
+The Patient Service currently provides REST operations for creating, retrieving, updating, and deleting patient records, along with request validation, centralized exception handling, automated tests, and continuous integration through GitHub Actions.
+
+Additional services and infrastructure will be introduced incrementally as development continues.
+
 
 ## License
 
