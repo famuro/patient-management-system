@@ -35,4 +35,11 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errors);
     }
+
+    @ExceptionHandler(PatientNotFoundException.class)
+    public ResponseEntity<Void> handlePatientNotFoundException(PatientNotFoundException ex) {
+        log.warn("Patient not found: {}", ex.getMessage());
+
+        return ResponseEntity.notFound().build();
+    }
 }
