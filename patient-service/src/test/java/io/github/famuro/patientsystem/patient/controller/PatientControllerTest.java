@@ -25,9 +25,11 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -200,6 +202,38 @@ class PatientControllerTest {
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void deletePatientByIdReturnsNoContent() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mockMvc.perform(delete("/patients/{id}", id))
+                .andExpect(status().isNoContent());
+
+        verify(patientService).deletePatientById(id);
+    }
+
+    @Test
+    void deletePatientByIdReturnsNotFoundWhenPatientDoesNotExist() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        doThrow(new PatientNotFoundException("Patient not found with id " + id))
+                .when(patientService).deletePatientById(id);
+
+        mockMvc.perform(delete("/patients/{id}", id))
+                .andExpect(status().isNotFound());
+
+        verify(patientService).deletePatientById(id);
+    }
+
+    @Test
+    void deletePatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
+
+        mockMvc.perform(delete("/patients/{id}", "not-a-uuid"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(patientService);
     }
 
     private PatientRequestDTO createPatientRequest() {

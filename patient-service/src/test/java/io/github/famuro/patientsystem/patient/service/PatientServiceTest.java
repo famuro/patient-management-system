@@ -153,4 +153,32 @@ class PatientServiceTest {
 
         return request;
     }
+
+    @Test
+    void deletePatientByIdDeletesPatientWhenFound() {
+        UUID id = UUID.randomUUID();
+
+        when(patientRepository.existsById(id)).thenReturn(true);
+
+        patientService.deletePatientById(id);
+
+        verify(patientRepository).existsById(id);
+        verify(patientRepository).deleteById(id);
+    }
+
+    @Test
+    void deletePatientByIdThrowsWhenPatientDoesNotExist() {
+        UUID id = UUID.randomUUID();
+
+        when(patientRepository.existsById(id)).thenReturn(false);
+
+        assertThrows(
+                PatientNotFoundException.class,
+                () -> patientService.deletePatientById(id)
+        );
+
+        verify(patientRepository).existsById(id);
+        verify(patientRepository, never()).deleteById(id);
+    }
+
 }
