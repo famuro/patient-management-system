@@ -1,42 +1,30 @@
-package io.github.famuro.patientsystem.patient.model;
+package io.github.famuro.patientsystem.patient.dto;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
-@Entity
-public class Patient {
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-
-    @NotNull
+public class PatientRequestDTO {
+    @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name cannot exceed 100 characters")
     private String name;
 
-    @NotNull
-    @Email
-    @Column(unique = true)
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email address")
+    @Size(max = 255)
     private String email;
 
-    @NotNull
+    @NotBlank(message = "Address is required")
+    @Size(max = 255)
     private String address;
 
-    @NotNull
+    @NotNull(message = "Date of birth is required")
+    @PastOrPresent(message = "Date of birth cannot be in the future")
     private LocalDate dateOfBirth;
-
-    @NotNull
-    private LocalDate registeredDate;
-
-    public UUID getId() {
-        return id;
-    }
 
     public String getName() {
         return name;
@@ -68,13 +56,5 @@ public class Patient {
 
     public void setDateOfBirth(LocalDate dateOfBirth) {
         this.dateOfBirth = dateOfBirth;
-    }
-
-    public LocalDate getRegisteredDate() {
-        return registeredDate;
-    }
-
-    public void setRegisteredDate(LocalDate registeredDate) {
-        this.registeredDate = registeredDate;
     }
 }
