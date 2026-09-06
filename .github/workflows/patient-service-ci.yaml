@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "patient-service/**"
+      - "docker-compose.yaml"
       - ".github/workflows/patient-service-ci.yml"
 
   push:
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - "patient-service/**"
+      - "docker-compose.yaml"
       - ".github/workflows/patient-service-ci.yml"
 
 permissions:
@@ -44,3 +46,18 @@ jobs:
 
       - name: Build and run tests
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Patient Service image
+        run: |
+          docker build \
+            --tag patient-management-system/patient-service:ci \
+            ./patient-service
