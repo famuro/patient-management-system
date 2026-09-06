@@ -1,32 +1,33 @@
 package io.github.famuro.patientsystem.patient.mapper;
 
-import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
-import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.model.Patient;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 
+@Component
 public class PatientMapper {
-    public static PatientResponseDTO toDTO(Patient patient) {
-        PatientResponseDTO patientResponseDTO = new PatientResponseDTO();
 
-        patientResponseDTO.setId(patient.getId().toString());
-        patientResponseDTO.setName(patient.getName());
-        patientResponseDTO.setEmail(patient.getEmail());
-        patientResponseDTO.setAddress(patient.getAddress());
-        patientResponseDTO.setDateOfBirth(patient.getDateOfBirth().toString());
-
-        return patientResponseDTO;
+    public PatientResponseDTO toDTO(Patient patient) {
+        return new PatientResponseDTO(
+                patient.getId().toString(),
+                patient.getName(),
+                patient.getEmail(),
+                patient.getAddress(),
+                patient.getDateOfBirth().toString()
+        );
     }
 
-    public static Patient toModel(PatientRequestDTO patientRequestDTO) {
+    public Patient toModel(PatientRequestDTO patientRequestDTO) {
         Patient patient = new Patient();
 
-        patient.setName(patientRequestDTO.getName());
-        patient.setEmail(patientRequestDTO.getEmail());
-        patient.setAddress(patientRequestDTO.getAddress());
-        patient.setDateOfBirth(patientRequestDTO.getDateOfBirth());
+        patient.setName(patientRequestDTO.name());
+        patient.setEmail(patientRequestDTO.email());
+        patient.setAddress(patientRequestDTO.address());
+        patient.setDateOfBirth(patientRequestDTO.dateOfBirth());
         patient.setRegisteredDate(LocalDate.now(ZoneId.systemDefault()));
 
         return patient;
