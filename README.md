@@ -35,22 +35,18 @@ Each service will be designed to remain independently buildable, testable, and d
 ## Technology Stack
 Currently implemented:
 
-- Java
-- Spring Boot
-- Spring Data JPA
-- Springdoc OpenAPI / Swagger UI
+- Spring Boot + Spring Data JPA
 - Maven
-- H2
-- JUnit
-- Mockito
+- JUnit + Mockito
+- PostgreSQL
 - GitHub Actions
+- Docker + Compose
+- OpenAPI / Swagger UI / Scalar
 
 Planned as the system expands:
 
 - Spring Security
 - Spring Cloud Gateway
-- PostgreSQL
-- Docker
 - gRPC
 - Apache Kafka
 
@@ -74,6 +70,63 @@ patient-management-system/
 
 The repository structure will be expanded as services and supporting infrastructure are implemented.
 
+## Development
+### Local Development with Docker
+
+The Patient Service can be run locally with PostgreSQL using Docker Compose.
+
+### Prerequisites
+
+* Docker
+* Docker Compose
+
+### Environment Configuration
+
+Create a local `.env` file from the provided `.env.example` and configure the Patient Service database credentials.
+
+```env
+PATIENT_POSTGRES_DB=patient_db
+PATIENT_POSTGRES_USER=patient_user
+PATIENT_POSTGRES_PASSWORD=your-password
+```
+
+The `.env` file is excluded from version control.
+
+### Start the Application
+
+From the repository root, run:
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+* the Patient Service
+* a PostgreSQL database dedicated to the Patient Service
+
+The Patient Service is available at:
+
+```text
+http://localhost:4000
+```
+
+### Stop the Application
+
+```bash
+docker compose down
+```
+
+PostgreSQL data is stored in a named Docker volume and persists between container restarts.
+To remove the containers and delete the local database volume:
+
+```bash
+docker compose down -v
+```
+
+> Running with `-v` permanently deletes the local PostgreSQL data stored by Docker Compose.
+
+
 ## API Documentation
 
 The Patient Service includes OpenAPI documentation generated with Springdoc.
@@ -87,15 +140,6 @@ localhost:4000/scalar
 ```
 The documentation includes the available patient endpoints, request operations, and API descriptions defined alongside the controller implementation. 
 OpenAPI annotations are maintained with the application code so that the API documentation evolves with the service.
-
-## Development
-
-The project is under active development.
-
-The Patient Service currently provides REST operations for creating, retrieving, updating, and deleting patient records, along with request validation, centralized exception handling, automated tests, and continuous integration through GitHub Actions.
-
-Additional services and infrastructure will be introduced incrementally as development continues.
-
 
 ## License
 
