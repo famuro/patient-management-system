@@ -20,6 +20,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -106,6 +107,17 @@ class PatientServiceTest {
         assertEquals("jon@example.com", response.getEmail());
         assertEquals("21 Jump St", response.getAddress());
         assertEquals("1990-01-01", response.getDateOfBirth());
+
+        verify(patientRepository).findAll();
+    }
+
+    @Test
+    void getPatientsReturnsEmptyListWhenNoPatientsExist() {
+        when(patientRepository.findAll()).thenReturn(List.of());
+
+        List<PatientResponseDTO> result = patientService.getPatients();
+
+        assertTrue(result.isEmpty());
 
         verify(patientRepository).findAll();
     }

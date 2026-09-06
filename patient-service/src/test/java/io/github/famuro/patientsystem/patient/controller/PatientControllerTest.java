@@ -70,6 +70,19 @@ class PatientControllerTest {
     }
 
     @Test
+    void getPatientsReturnsEmptyListWhenNoPatientsExist() throws Exception {
+        when(patientService.getPatients()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/patients"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+
+        verify(patientService).getPatients();
+    }
+
+    @Test
     void getPatientByIdReturnsPatient() throws Exception {
         UUID id = UUID.randomUUID();
 
@@ -139,7 +152,7 @@ class PatientControllerTest {
     }
 
     @Test
-    void createPatientReturnsBadRequestForInvalidRequest() throws Exception {
+    void createPatientReturnsBadRequestForMissingFields() throws Exception {
         PatientRequestDTO request = new PatientRequestDTO();
 
         mockMvc.perform(post("/api/v1/patients")
@@ -170,6 +183,26 @@ class PatientControllerTest {
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.email").value("Invalid email address"));
+    }
+
+    @Test
+    void createPatientReturnsBadRequestForMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ invalid json }"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(patientService);
+    }
+
+    @Test
+    void createPatientRejectsUnsupportedContentType() throws Exception {
+        mockMvc.perform(post("/api/v1/patients")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("patient"))
+                .andExpect(status().isUnsupportedMediaType());
+
+        verifyNoInteractions(patientService);
     }
 
     @ParameterizedTest
