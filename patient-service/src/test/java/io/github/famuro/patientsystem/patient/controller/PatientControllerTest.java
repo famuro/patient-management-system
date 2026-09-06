@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -54,7 +55,9 @@ class PatientControllerTest {
     // =========================================================================
     @Test
     void getPatientsReturnsPatients() throws Exception {
-        PatientResponseDTO patient = createPatientResponse();
+        UUID id = UUID.randomUUID();
+
+        PatientResponseDTO patient = createPatientResponse(id);
 
         when(patientService.getPatients())
                 .thenReturn(List.of(patient));
@@ -62,9 +65,9 @@ class PatientControllerTest {
         mockMvc.perform(get("/api/v1/patients"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].id").value(patient.getId()))
-                .andExpect(jsonPath("$[0].name").value(patient.getName()))
-                .andExpect(jsonPath("$[0].email").value(patient.getEmail()));
+                .andExpect(jsonPath("$[0].id").value(patient.id()))
+                .andExpect(jsonPath("$[0].name").value(patient.name()))
+                .andExpect(jsonPath("$[0].email").value(patient.email()));
 
         verify(patientService).getPatients();
     }
@@ -86,8 +89,7 @@ class PatientControllerTest {
     void getPatientByIdReturnsPatient() throws Exception {
         UUID id = UUID.randomUUID();
 
-        PatientResponseDTO response = createPatientResponse();
-        response.setId(id.toString());
+        PatientResponseDTO response = createPatientResponse(id);
 
         when(patientService.getPatientById(id))
                 .thenReturn(response);
@@ -97,11 +99,10 @@ class PatientControllerTest {
                 .andExpect(content()
                         .contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(id.toString()))
-                .andExpect(jsonPath("$.name").value(response.getName()))
-                .andExpect(jsonPath("$.email").value(response.getEmail()))
-                .andExpect(jsonPath("$.address").value(response.getAddress()))
-                .andExpect(jsonPath("$.dateOfBirth")
-                        .value(response.getDateOfBirth()));
+                .andExpect(jsonPath("$.name").value(response.name()))
+                .andExpect(jsonPath("$.email").value(response.email()))
+                .andExpect(jsonPath("$.address").value(response.address()))
+                .andExpect(jsonPath("$.dateOfBirth").value(response.dateOfBirth()));
 
         verify(patientService).getPatientById(id);
     }
@@ -132,8 +133,10 @@ class PatientControllerTest {
     // =========================================================================
     @Test
     void createPatientReturnsCreatedPatient() throws Exception {
+        UUID id = UUID.randomUUID();
+
         PatientRequestDTO request = createPatientRequest();
-        PatientResponseDTO response = createPatientResponse();
+        PatientResponseDTO response = createPatientResponse(id);
 
         when(patientService.createPatient(any(PatientRequestDTO.class)))
                 .thenReturn(response);
@@ -144,16 +147,16 @@ class PatientControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string(
                         "Location",
-                        "/api/v1/patients/" + response.getId()
+                        "/api/v1/patients/" + response.id()
                 ))
-                .andExpect(jsonPath("$.id").value(response.getId()))
-                .andExpect(jsonPath("$.name").value(response.getName()))
-                .andExpect(jsonPath("$.email").value(response.getEmail()));
+                .andExpect(jsonPath("$.id").value(response.id()))
+                .andExpect(jsonPath("$.name").value(response.name()))
+                .andExpect(jsonPath("$.email").value(response.email()));
     }
 
     @Test
     void createPatientReturnsBadRequestForMissingFields() throws Exception {
-        PatientRequestDTO request = new PatientRequestDTO();
+        PatientRequestDTO request = new PatientRequestDTO("", "", "", null);
 
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -175,8 +178,7 @@ class PatientControllerTest {
             "example@.com"
     })
     void createPatientReturnsBadRequestForInvalidEmail(String invalidEmail) throws Exception {
-        PatientRequestDTO request = createPatientRequest();
-        request.setEmail(invalidEmail);
+        PatientRequestDTO request = createPatientRequestWithEmail(invalidEmail);
 
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -206,10 +208,9 @@ class PatientControllerTest {
     }
 
     @ParameterizedTest
-    @MethodSource("futureDatesOfBirth")
+    @MethodSource("getFutureDates")
     void createPatientReturnsBadRequestForFutureDateOfBirth(LocalDate dateOfBirth) throws Exception {
-        PatientRequestDTO request = createPatientRequest();
-        request.setDateOfBirth(dateOfBirth);
+        PatientRequestDTO request = createPatientRequestWithDateOfBirth(dateOfBirth);
 
         mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -220,10 +221,11 @@ class PatientControllerTest {
 
     @Test
     void createPatientAcceptsTodayDateOfBirth() throws Exception {
-        PatientRequestDTO request = createPatientRequest();
-        request.setDateOfBirth(LocalDate.now(ZoneId.systemDefault()));
+        UUID id = UUID.randomUUID();
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
 
-        PatientResponseDTO response = createPatientResponse();
+        PatientRequestDTO request = createPatientRequestWithDateOfBirth(today);
+        PatientResponseDTO response = createPatientResponse(id);
 
         when(patientService.createPatient(any(PatientRequestDTO.class)))
                 .thenReturn(response);
@@ -258,8 +260,7 @@ class PatientControllerTest {
         UUID id = UUID.randomUUID();
 
         PatientRequestDTO request = createPatientRequest();
-        PatientResponseDTO response = createPatientResponse();
-        response.setId(id.toString());
+        PatientResponseDTO response = createPatientResponse(id);
 
         when(patientService.updatePatient(
                 eq(id),
@@ -271,11 +272,10 @@ class PatientControllerTest {
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
-                .andExpect(jsonPath("$.name").value(response.getName()))
-                .andExpect(jsonPath("$.email").value(response.getEmail()))
-                .andExpect(jsonPath("$.address").value(response.getAddress()))
-                .andExpect(jsonPath("$.dateOfBirth")
-                        .value(response.getDateOfBirth()));
+                .andExpect(jsonPath("$.name").value(response.name()))
+                .andExpect(jsonPath("$.email").value(response.email()))
+                .andExpect(jsonPath("$.address").value(response.address()))
+                .andExpect(jsonPath("$.dateOfBirth").value(response.dateOfBirth()));
 
         verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
     }
@@ -284,7 +284,7 @@ class PatientControllerTest {
     void updatePatientReturnsBadRequestForInvalidRequest() throws Exception {
 
         UUID id = UUID.randomUUID();
-        PatientRequestDTO request = new PatientRequestDTO();
+        PatientRequestDTO request = new PatientRequestDTO("", "", "", null);
 
         mockMvc.perform(put("/api/v1/patients/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -389,27 +389,43 @@ class PatientControllerTest {
     // HELPER METHODS
     // =========================================================================
     private PatientRequestDTO createPatientRequest() {
-        PatientRequestDTO request = new PatientRequestDTO();
-        request.setName("Jon Snow");
-        request.setEmail("jon@example.com");
-        request.setAddress("21 Jump St");
-        request.setDateOfBirth(LocalDate.of(1990, 1, 1));
-
-        return request;
+        return new PatientRequestDTO(
+                "Jon Snow",
+                "jon@example.com",
+                "21 Jump St",
+                LocalDate.of(1990, Month.JANUARY, 1)
+        );
     }
 
-    private PatientResponseDTO createPatientResponse() {
-        PatientResponseDTO response = new PatientResponseDTO();
-        response.setId(UUID.randomUUID().toString());
-        response.setName("Jon Snow");
-        response.setEmail("jon@example.com");
-        response.setAddress("21 Jump St");
-        response.setDateOfBirth("1990-01-01");
-
-        return response;
+    private PatientRequestDTO createPatientRequestWithEmail(String email) {
+        return new PatientRequestDTO(
+                "Jon Snow",
+                email,
+                "21 Jump St",
+                LocalDate.of(1990, Month.JANUARY, 1)
+        );
     }
 
-    private static Stream<LocalDate> futureDatesOfBirth() {
+    private PatientRequestDTO createPatientRequestWithDateOfBirth(LocalDate dateOfBirth) {
+        return new PatientRequestDTO(
+                "Jon Snow",
+                "jon@example.com",
+                "21 Jump St",
+                dateOfBirth
+        );
+    }
+
+    private PatientResponseDTO createPatientResponse(UUID id) {
+        return new PatientResponseDTO(
+                id.toString(),
+                "Jon Snow",
+                "jon@example.com",
+                "21 Jump St",
+                "1990-01-01"
+        );
+    }
+
+    private static Stream<LocalDate> getFutureDates() {
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
 
         return Stream.of(

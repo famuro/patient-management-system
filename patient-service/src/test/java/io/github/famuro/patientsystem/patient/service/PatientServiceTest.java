@@ -4,6 +4,7 @@ import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
+import io.github.famuro.patientsystem.patient.mapper.PatientMapper;
 import io.github.famuro.patientsystem.patient.model.Patient;
 import io.github.famuro.patientsystem.patient.repository.PatientRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,8 @@ class PatientServiceTest {
 
     @BeforeEach
     void setUp() {
-        patientService = new PatientService(patientRepository);
+        PatientMapper patientMapper = new PatientMapper();
+        patientService = new PatientService(patientRepository, patientMapper);
     }
 
     // =========================================================================
@@ -45,24 +47,25 @@ class PatientServiceTest {
         Patient savedPatient = mock(Patient.class);
         UUID id = UUID.randomUUID();
 
-        when(patientRepository.existsByEmail(request.getEmail())).thenReturn(false);
+        when(patientRepository.existsByEmail(request.email())).thenReturn(false);
 
         when(savedPatient.getId()).thenReturn(id);
-        when(savedPatient.getName()).thenReturn(request.getName());
-        when(savedPatient.getEmail()).thenReturn(request.getEmail());
-        when(savedPatient.getAddress()).thenReturn(request.getAddress());
-        when(savedPatient.getDateOfBirth()).thenReturn(request.getDateOfBirth());
+        when(savedPatient.getName()).thenReturn(request.name());
+        when(savedPatient.getEmail()).thenReturn(request.email());
+        when(savedPatient.getAddress()).thenReturn(request.address());
+        when(savedPatient.getDateOfBirth()).thenReturn(request.dateOfBirth());
 
         when(patientRepository.save(any(Patient.class))).thenReturn(savedPatient);
 
         PatientResponseDTO result = patientService.createPatient(request);
 
-        assertEquals(id.toString(), result.getId());
-        assertEquals(request.getName(), result.getName());
-        assertEquals(request.getEmail(), result.getEmail());
-        assertEquals(request.getAddress(), result.getAddress());
+        assertEquals(id.toString(), result.id());
+        assertEquals(request.name(), result.name());
+        assertEquals(request.email(), result.email());
+        assertEquals(request.address(), result.address());
+        assertEquals(request.dateOfBirth().toString(), result.dateOfBirth());
 
-        verify(patientRepository).existsByEmail(request.getEmail());
+        verify(patientRepository).existsByEmail(request.email());
         verify(patientRepository).save(any(Patient.class));
     }
 
@@ -70,14 +73,18 @@ class PatientServiceTest {
     void createPatientThrowsWhenEmailAlreadyExists() {
         PatientRequestDTO request = createPatientRequest();
 
-        when(patientRepository.existsByEmail(request.getEmail())).thenReturn(true);
+        when(patientRepository.existsByEmail(request.email())).thenReturn(true);
 
-        assertThrows(
+        EmailAlreadyExistsException exception = assertThrows(
                 EmailAlreadyExistsException.class,
-                () -> patientService.createPatient(request)
+                () -> patientService.createPatient(request));
+
+        assertEquals(
+                "A patient with this email already exists",
+                exception.getMessage()
         );
 
-        verify(patientRepository).existsByEmail(request.getEmail());
+        verify(patientRepository).existsByEmail(request.email());
         verify(patientRepository, never()).save(any());
     }
 
@@ -102,11 +109,11 @@ class PatientServiceTest {
         assertEquals(1, result.size());
 
         PatientResponseDTO response = result.getFirst();
-        assertEquals(id.toString(), response.getId());
-        assertEquals("Jon Snow", response.getName());
-        assertEquals("jon@example.com", response.getEmail());
-        assertEquals("21 Jump St", response.getAddress());
-        assertEquals("1990-01-01", response.getDateOfBirth());
+        assertEquals(id.toString(), response.id());
+        assertEquals("Jon Snow", response.name());
+        assertEquals("jon@example.com", response.email());
+        assertEquals("21 Jump St", response.address());
+        assertEquals("1990-01-01", response.dateOfBirth());
 
         verify(patientRepository).findAll();
     }
@@ -138,11 +145,11 @@ class PatientServiceTest {
 
         PatientResponseDTO result = patientService.getPatientById(id);
 
-        assertEquals(id.toString(), result.getId());
-        assertEquals("Jon Snow", result.getName());
-        assertEquals("jon@example.com", result.getEmail());
-        assertEquals("21 Jump St", result.getAddress());
-        assertEquals("1990-01-01", result.getDateOfBirth());
+        assertEquals(id.toString(), result.id());
+        assertEquals("Jon Snow", result.name());
+        assertEquals("jon@example.com", result.email());
+        assertEquals("21 Jump St", result.address());
+        assertEquals("1990-01-01", result.dateOfBirth());
 
         verify(patientRepository).findById(id);
     }
@@ -174,33 +181,30 @@ class PatientServiceTest {
         PatientRequestDTO request = createPatientRequest();
 
         when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
-        when(patientRepository.existsByEmailAndIdNot(request.getEmail(), id)).thenReturn(false);
+        when(patientRepository.existsByEmailAndIdNot(request.email(), id)).thenReturn(false);
         when(patientRepository.save(patient)).thenReturn(patient);
 
         when(patient.getId()).thenReturn(id);
-        when(patient.getName()).thenReturn(request.getName());
-        when(patient.getEmail()).thenReturn(request.getEmail());
-        when(patient.getAddress()).thenReturn(request.getAddress());
-        when(patient.getDateOfBirth()).thenReturn(request.getDateOfBirth());
+        when(patient.getName()).thenReturn(request.name());
+        when(patient.getEmail()).thenReturn(request.email());
+        when(patient.getAddress()).thenReturn(request.address());
+        when(patient.getDateOfBirth()).thenReturn(request.dateOfBirth());
 
         PatientResponseDTO result = patientService.updatePatient(id, request);
 
-        assertEquals(id.toString(), result.getId());
-        assertEquals(request.getName(), result.getName());
-        assertEquals(request.getEmail(), result.getEmail());
-        assertEquals(request.getAddress(), result.getAddress());
-        assertEquals(
-                request.getDateOfBirth().toString(),
-                result.getDateOfBirth()
-        );
+        assertEquals(id.toString(), result.id());
+        assertEquals(request.name(), result.name());
+        assertEquals(request.email(), result.email());
+        assertEquals(request.address(), result.address());
+        assertEquals(request.dateOfBirth().toString(), result.dateOfBirth());
 
         verify(patientRepository).findById(id);
-        verify(patientRepository).existsByEmailAndIdNot(request.getEmail(), id);
+        verify(patientRepository).existsByEmailAndIdNot(request.email(), id);
 
-        verify(patient).setName(request.getName());
-        verify(patient).setEmail(request.getEmail());
-        verify(patient).setAddress(request.getAddress());
-        verify(patient).setDateOfBirth(request.getDateOfBirth());
+        verify(patient).setName(request.name());
+        verify(patient).setEmail(request.email());
+        verify(patient).setAddress(request.address());
+        verify(patient).setDateOfBirth(request.dateOfBirth());
 
         verify(patientRepository).save(patient);
     }
@@ -234,7 +238,7 @@ class PatientServiceTest {
         PatientRequestDTO request = createPatientRequest();
 
         when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
-        when(patientRepository.existsByEmailAndIdNot(request.getEmail(), id)).thenReturn(true);
+        when(patientRepository.existsByEmailAndIdNot(request.email(), id)).thenReturn(true);
 
         EmailAlreadyExistsException exception = assertThrows(
                 EmailAlreadyExistsException.class,
@@ -247,7 +251,7 @@ class PatientServiceTest {
         );
 
         verify(patientRepository).findById(id);
-        verify(patientRepository).existsByEmailAndIdNot(request.getEmail(), id);
+        verify(patientRepository).existsByEmailAndIdNot(request.email(), id);
         verify(patientRepository, never()).save(any());
     }
 
@@ -285,12 +289,11 @@ class PatientServiceTest {
     // HELPER METHODS
     // =========================================================================
     private PatientRequestDTO createPatientRequest() {
-        PatientRequestDTO request = new PatientRequestDTO();
-        request.setName("Jon Snow");
-        request.setEmail("jon@example.com");
-        request.setAddress("21 Jump St");
-        request.setDateOfBirth(LocalDate.of(1990, Month.JANUARY, 1));
-
-        return request;
+        return new PatientRequestDTO(
+                "Jon Snow",
+                "jon@example.com",
+                "21 Jump St",
+                LocalDate.of(1990, Month.JANUARY, 1)
+        );
     }
 }

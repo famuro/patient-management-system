@@ -49,7 +49,7 @@ public class PatientController {
     public ResponseEntity<PatientResponseDTO> createPatient(@Valid @RequestBody PatientRequestDTO patientRequestDTO) {
         PatientResponseDTO patientResponseDTO = patientService.createPatient(patientRequestDTO);
 
-        URI location = URI.create("/api/v1/patients/" + patientResponseDTO.getId());
+        URI location = URI.create("/api/v1/patients/" + patientResponseDTO.id());
 
         return ResponseEntity.created(location).body(patientResponseDTO);
     }
