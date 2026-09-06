@@ -1,4 +1,4 @@
-package io.github.famuro.patientsystem.patient.dto;
+package io.github.famuro.patientsystem.patient.dto.v1;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

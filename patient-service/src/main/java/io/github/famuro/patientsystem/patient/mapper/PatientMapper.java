@@ -1,7 +1,7 @@
 package io.github.famuro.patientsystem.patient.mapper;
 
-import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
-import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.model.Patient;
 
 import java.time.LocalDate;

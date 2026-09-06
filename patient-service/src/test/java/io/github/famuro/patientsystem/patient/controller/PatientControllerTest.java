@@ -1,7 +1,8 @@
 package io.github.famuro.patientsystem.patient.controller;
 
-import io.github.famuro.patientsystem.patient.dto.PatientRequestDTO;
-import io.github.famuro.patientsystem.patient.dto.PatientResponseDTO;
+import io.github.famuro.patientsystem.patient.controller.v1.PatientController;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
+import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
 import io.github.famuro.patientsystem.patient.service.PatientService;
@@ -48,6 +49,9 @@ class PatientControllerTest {
     @MockitoBean
     private PatientService patientService;
 
+    // =========================================================================
+    // GET TESTS
+    // =========================================================================
     @Test
     void getPatientsReturnsPatients() throws Exception {
         PatientResponseDTO patient = createPatientResponse();
@@ -55,7 +59,7 @@ class PatientControllerTest {
         when(patientService.getPatients())
                 .thenReturn(List.of(patient));
 
-        mockMvc.perform(get("/patients"))
+        mockMvc.perform(get("/api/v1/patients"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$[0].id").value(patient.getId()))
@@ -75,7 +79,7 @@ class PatientControllerTest {
         when(patientService.getPatientById(id))
                 .thenReturn(response);
 
-        mockMvc.perform(get("/patients/{id}", id))
+        mockMvc.perform(get("/api/v1/patients/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(content()
                         .contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -96,7 +100,7 @@ class PatientControllerTest {
         when(patientService.getPatientById(id))
                 .thenThrow(new PatientNotFoundException("Patient not found with id " + id));
 
-        mockMvc.perform(get("/patients/{id}", id))
+        mockMvc.perform(get("/api/v1/patients/{id}", id))
                 .andExpect(status().isNotFound());
 
         verify(patientService).getPatientById(id);
@@ -104,12 +108,15 @@ class PatientControllerTest {
 
     @Test
     void getPatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
-        mockMvc.perform(get("/patients/{id}", "not-a-valid-uuid"))
+        mockMvc.perform(get("/api/v1/patients/{id}", "not-a-valid-uuid"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(patientService);
     }
 
+    // =========================================================================
+    // POST TESTS
+    // =========================================================================
     @Test
     void createPatientReturnsCreatedPatient() throws Exception {
         PatientRequestDTO request = createPatientRequest();
@@ -118,10 +125,14 @@ class PatientControllerTest {
         when(patientService.createPatient(any(PatientRequestDTO.class)))
                 .thenReturn(response);
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/patients/" + response.getId()
+                ))
                 .andExpect(jsonPath("$.id").value(response.getId()))
                 .andExpect(jsonPath("$.name").value(response.getName()))
                 .andExpect(jsonPath("$.email").value(response.getEmail()));
@@ -131,7 +142,7 @@ class PatientControllerTest {
     void createPatientReturnsBadRequestForInvalidRequest() throws Exception {
         PatientRequestDTO request = new PatientRequestDTO();
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -154,7 +165,7 @@ class PatientControllerTest {
         PatientRequestDTO request = createPatientRequest();
         request.setEmail(invalidEmail);
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -167,7 +178,7 @@ class PatientControllerTest {
         PatientRequestDTO request = createPatientRequest();
         request.setDateOfBirth(dateOfBirth);
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -184,7 +195,7 @@ class PatientControllerTest {
         when(patientService.createPatient(any(PatientRequestDTO.class)))
                 .thenReturn(response);
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -199,13 +210,16 @@ class PatientControllerTest {
                         "A patient with this email already exists"
                 ));
 
-        mockMvc.perform(post("/patients")
+        mockMvc.perform(post("/api/v1/patients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").exists());
     }
 
+    // =========================================================================
+    // PUT TESTS
+    // =========================================================================
     @Test
     void updatePatientReturnsUpdatedPatient() throws Exception {
         UUID id = UUID.randomUUID();
@@ -219,7 +233,7 @@ class PatientControllerTest {
                 any(PatientRequestDTO.class)
         )).thenReturn(response);
 
-        mockMvc.perform(put("/patients/{id}", id)
+        mockMvc.perform(put("/api/v1/patients/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -239,7 +253,7 @@ class PatientControllerTest {
         UUID id = UUID.randomUUID();
         PatientRequestDTO request = new PatientRequestDTO();
 
-        mockMvc.perform(put("/patients/{id}", id)
+        mockMvc.perform(put("/api/v1/patients/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
@@ -262,7 +276,7 @@ class PatientControllerTest {
                 any(PatientRequestDTO.class)
         )).thenThrow(new PatientNotFoundException("Patient not found with id " + id));
 
-        mockMvc.perform(put("/patients/{id}", id)
+        mockMvc.perform(put("/api/v1/patients/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -281,7 +295,7 @@ class PatientControllerTest {
                 any(PatientRequestDTO.class)
         )).thenThrow(new EmailAlreadyExistsException("A patient with this email already exists"));
 
-        mockMvc.perform(put("/patients/{id}", id)
+        mockMvc.perform(put("/api/v1/patients/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
@@ -295,7 +309,7 @@ class PatientControllerTest {
 
         PatientRequestDTO request = createPatientRequest();
 
-        mockMvc.perform(put("/patients/{id}", "not-a-uuid")
+        mockMvc.perform(put("/api/v1/patients/{id}", "not-a-uuid")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -303,11 +317,14 @@ class PatientControllerTest {
         verifyNoInteractions(patientService);
     }
 
+    // =========================================================================
+    // DELETE TESTS
+    // =========================================================================
     @Test
     void deletePatientByIdReturnsNoContent() throws Exception {
         UUID id = UUID.randomUUID();
 
-        mockMvc.perform(delete("/patients/{id}", id))
+        mockMvc.perform(delete("/api/v1/patients/{id}", id))
                 .andExpect(status().isNoContent());
 
         verify(patientService).deletePatientById(id);
@@ -320,7 +337,7 @@ class PatientControllerTest {
         doThrow(new PatientNotFoundException("Patient not found with id " + id))
                 .when(patientService).deletePatientById(id);
 
-        mockMvc.perform(delete("/patients/{id}", id))
+        mockMvc.perform(delete("/api/v1/patients/{id}", id))
                 .andExpect(status().isNotFound());
 
         verify(patientService).deletePatientById(id);
@@ -329,12 +346,15 @@ class PatientControllerTest {
     @Test
     void deletePatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
 
-        mockMvc.perform(delete("/patients/{id}", "not-a-uuid"))
+        mockMvc.perform(delete("/api/v1/patients/{id}", "not-a-uuid"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(patientService);
     }
 
+    // =========================================================================
+    // HELPER METHODS
+    // =========================================================================
     private PatientRequestDTO createPatientRequest() {
         PatientRequestDTO request = new PatientRequestDTO();
         request.setName("Jon Snow");
