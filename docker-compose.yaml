@@ -31,5 +31,13 @@ services:
       patient-db:
         condition: service_healthy
 
+  billing-service:
+    image: patient-management-system/billing-service:local
+    build:
+      context: .
+      dockerfile: billing-service/Dockerfile
+    ports:
+      - "9090:9090"
+
 volumes:
   patient-postgres-data:
