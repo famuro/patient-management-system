@@ -1,25 +1,23 @@
-name: Patient Service CI
+name: Billing Service CI
 
 on:
   pull_request:
     branches:
       - main
     paths: &shared_paths
-      - "patient-service/**"
+      - "billing-service/**"
+      - "contracts/billing-contract/**"
       - "pom.xml"
       - ".mvn/**"
       - "mvnw"
       - "mvnw.cmd"
       - "docker-compose.yaml"
-      - ".github/workflows/patient-service.yaml"
+      - ".github/workflows/billing-service.yaml"
 
   push:
     branches:
       - main
     paths: *shared_paths
-
-permissions:
-  contents: read
 
 jobs:
   test:
@@ -27,26 +25,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up Java
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: "21"
-          cache: maven
-          cache-dependency-path: patient-service/pom.xml
+          distribution: "temurin"
+          cache: "maven"
 
       - name: Make Maven Wrapper executable
         run: chmod +x mvnw
 
-      - name: Build and run tests
+      - name: Build and test Billing Service
         run: |
           ./mvnw \
             --batch-mode \
             --no-transfer-progress \
-            -pl patient-service \
+            -pl billing-service \
             -am \
             clean verify
 
@@ -56,11 +53,12 @@ jobs:
     needs: test
 
     steps:
-      - name: Checkout repository
+      - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Build Patient Service image
+      - name: Build Billing Service image
         run: |
           docker build \
-            --tag patient-management-system/patient-service:ci \
-            ./patient-service
+            --file billing-service/Dockerfile \
+            --tag patient-management-system/billing-service:ci \
+            .
