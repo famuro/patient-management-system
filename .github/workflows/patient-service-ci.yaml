@@ -10,7 +10,6 @@ on:
       - ".mvn/**"
       - "mvnw"
       - "mvnw.cmd"
-      - "docker-compose.yaml"
       - ".github/workflows/patient-service.yaml"
 
   push:
@@ -62,5 +61,6 @@ jobs:
       - name: Build Patient Service image
         run: |
           docker build \
+            --file patient-service/Dockerfile \
             --tag patient-management-system/patient-service:ci \
-            ./patient-service
+            .

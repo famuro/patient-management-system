@@ -3,24 +3,34 @@
 # ============================================================
 # Use an official Maven image with Java 21 to compile and package
 # the Spring Boot application in a reproducible build environment.
-FROM maven:3.9.16-eclipse-temurin-21-alpine AS builder
+FROM maven:3.9.16-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# Copy the Maven project descriptor first so dependency resolution can
-# be cached independently from application source changes.
+# Copy Maven descriptors first so dependency resolution can be cached
+# independently from application source changes.
 COPY pom.xml .
+COPY patient-service/pom.xml patient-service/pom.xml
+COPY billing-service/pom.xml billing-service/pom.xml
+COPY contracts/billing-contract/pom.xml contracts/billing-contract/pom.xml
 
-# Download application dependencies before copying source code.
-# This improves Docker layer reuse when only source files change.
-RUN mvn --batch-mode --no-transfer-progress dependency:go-offline
+# Download dependencies for the Patient Service and any reactor modules
+# required by its dependency graph.
+RUN mvn --batch-mode --no-transfer-progress \
+    -pl patient-service \
+    -am \
+    dependency:go-offline
 
-# Copy application source and build the executable Spring Boot JAR.
-COPY src ./src
+# Copy only the Patient Service source required for this image build.
+COPY patient-service/src patient-service/src
 
-# Tests are executed separately by the CI pipeline before the image build,
-# so they are skipped here to avoid running the same suite twice.
-RUN mvn --batch-mode --no-transfer-progress clean package -DskipTests
+# Build the Patient Service from the root Maven reactor.
+# Tests are executed separately by CI before the Docker image is built.
+RUN mvn --batch-mode --no-transfer-progress \
+    -pl patient-service \
+    -am \
+    clean package \
+    -DskipTests
 
 
 # ============================================================
@@ -39,7 +49,9 @@ RUN groupadd --system spring \
 
 # Copy only the packaged application artifact from the build stage.
 # Maven and the full JDK are not included in the final runtime image.
-COPY --from=builder /app/target/patient-service.jar app.jar
+COPY --from=builder \
+    /app/patient-service/target/patient-service.jar \
+    app.jar
 
 # Ensure the application process does not run as root.
 USER spring:spring

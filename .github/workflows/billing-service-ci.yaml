@@ -11,7 +11,6 @@ on:
       - ".mvn/**"
       - "mvnw"
       - "mvnw.cmd"
-      - "docker-compose.yaml"
       - ".github/workflows/billing-service.yaml"
 
   push:
