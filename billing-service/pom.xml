@@ -37,6 +37,13 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-services</artifactId>
         </dependency>
+
+        <!-- Shared generated protobuf and gRPC contract -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>billing-contract</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package billing.v1;
+
+option java_multiple_files = true;
+option java_package = "io.github.famuro.patientsystem.contract.billing.v1";
+
+service BillingService {
+  rpc CreateBillingAccount(BillingRequest)
+      returns (BillingResponse);
+}
+
+enum AccountStatus {
+  UNSPECIFIED = 0;
+  ACTIVE = 1;
+  SUSPENDED = 2;
+  CLOSED = 3;
+}
+
+message BillingRequest {
+  string patient_id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+message BillingResponse {
+  string account_id = 1;
+  string patient_id = 2;
+  AccountStatus status = 3;
+}
