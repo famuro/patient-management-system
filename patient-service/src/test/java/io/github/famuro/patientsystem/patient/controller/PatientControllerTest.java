@@ -3,6 +3,7 @@ package io.github.famuro.patientsystem.patient.controller;
 import io.github.famuro.patientsystem.patient.controller.v1.PatientController;
 import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
+import io.github.famuro.patientsystem.patient.error.ErrorMessages;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
 import io.github.famuro.patientsystem.patient.service.PatientService;
@@ -26,8 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -55,19 +55,26 @@ class PatientControllerTest {
     // =========================================================================
     @Test
     void getPatientsReturnsPatients() throws Exception {
-        UUID id = UUID.randomUUID();
+        PatientResponseDTO patient = createPatientResponse(UUID.randomUUID());
+        PatientResponseDTO patient2 = createPatientResponse(UUID.randomUUID());
 
-        PatientResponseDTO patient = createPatientResponse(id);
+        when(patientService.getPatients()).thenReturn(List.of(patient, patient2));
 
-        when(patientService.getPatients())
-                .thenReturn(List.of(patient));
-
-        mockMvc.perform(get("/api/v1/patients"))
+        mockMvc.perform(get(PATIENTS_API_URL))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(patient.id()))
                 .andExpect(jsonPath("$[0].name").value(patient.name()))
-                .andExpect(jsonPath("$[0].email").value(patient.email()));
+                .andExpect(jsonPath("$[0].email").value(patient.email()))
+                .andExpect(jsonPath("$[0].address").value(patient.address()))
+                .andExpect(jsonPath("$[0].dateOfBirth").value(patient.dateOfBirth()))
+                .andExpect(jsonPath("$[1].id").value(patient2.id()))
+                .andExpect(jsonPath("$[1].name").value(patient2.name()))
+                .andExpect(jsonPath("$[1].email").value(patient2.email()))
+                .andExpect(jsonPath("$[1].address").value(patient2.address()))
+                .andExpect(jsonPath("$[1].dateOfBirth").value(patient2.dateOfBirth()));
 
         verify(patientService).getPatients();
     }
@@ -76,7 +83,7 @@ class PatientControllerTest {
     void getPatientsReturnsEmptyListWhenNoPatientsExist() throws Exception {
         when(patientService.getPatients()).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/v1/patients"))
+        mockMvc.perform(get(PATIENTS_API_URL))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$").isArray())
@@ -91,13 +98,10 @@ class PatientControllerTest {
 
         PatientResponseDTO response = createPatientResponse(id);
 
-        when(patientService.getPatientById(id))
-                .thenReturn(response);
+        when(patientService.getPatientById(id)).thenReturn(response);
 
-        mockMvc.perform(get("/api/v1/patients/{id}", id))
+        mockMvc.perform(get(PATIENTS_API_URL + "/{id}", id))
                 .andExpect(status().isOk())
-                .andExpect(content()
-                        .contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.name").value(response.name()))
                 .andExpect(jsonPath("$.email").value(response.email()))
@@ -114,16 +118,32 @@ class PatientControllerTest {
         when(patientService.getPatientById(id))
                 .thenThrow(new PatientNotFoundException("Patient not found with id " + id));
 
-        mockMvc.perform(get("/api/v1/patients/{id}", id))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(get(PATIENTS_API_URL + "/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.PATIENT_NOT_FOUND_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Patient not found with id " + id))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/" + id));
 
         verify(patientService).getPatientById(id);
     }
 
     @Test
     void getPatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
-        mockMvc.perform(get("/api/v1/patients/{id}", "not-a-valid-uuid"))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(get(PATIENTS_API_URL + "/{id}", "not-a-valid-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.INVALID_PARAMETER_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Invalid value for parameter 'id'"))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/not-a-valid-uuid"));
 
         verifyNoInteractions(patientService);
     }
@@ -136,36 +156,47 @@ class PatientControllerTest {
         UUID id = UUID.randomUUID();
 
         PatientRequestDTO request = createPatientRequest();
-        PatientResponseDTO response = createPatientResponse(id);
+        PatientResponseDTO response = createPatientResponseFromRequest(id, request);
 
-        when(patientService.createPatient(any(PatientRequestDTO.class)))
-                .thenReturn(response);
+        when(patientService.createPatient(request)).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(
                         "Location",
-                        "/api/v1/patients/" + response.id()
+                        PATIENTS_API_URL + "/" + id
                 ))
-                .andExpect(jsonPath("$.id").value(response.id()))
+                .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.name").value(response.name()))
-                .andExpect(jsonPath("$.email").value(response.email()));
+                .andExpect(jsonPath("$.email").value(response.email()))
+                .andExpect(jsonPath("$.address").value(response.address()))
+                .andExpect(jsonPath("$.dateOfBirth").value(response.dateOfBirth()));
+
+        verify(patientService).createPatient(request);
     }
 
     @Test
     void createPatientReturnsBadRequestForMissingFields() throws Exception {
         PatientRequestDTO request = new PatientRequestDTO("", "", "", null);
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.name").value("Name is required"))
-                .andExpect(jsonPath("$.email").value("Email is required"))
-                .andExpect(jsonPath("$.address").value("Address is required"))
-                .andExpect(jsonPath("$.dateOfBirth").value("Date of birth is required"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.VALIDATION_FAILED_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.errors.name").exists())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.address").exists())
+                .andExpect(jsonPath("$.errors.dateOfBirth").exists());
+
+        verifyNoInteractions(patientService);
     }
 
     @ParameterizedTest
@@ -180,29 +211,78 @@ class PatientControllerTest {
     void createPatientReturnsBadRequestForInvalidEmail(String invalidEmail) throws Exception {
         PatientRequestDTO request = createPatientRequestWithEmail(invalidEmail);
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.email").value("Invalid email address"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.VALIDATION_FAILED_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.errors.email")
+                        .value("Invalid email address"));
+
+        verifyNoInteractions(patientService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("getMalformedJson")
+    void createPatientReturnsBadRequestForMalformedJson(String malformedJson) throws Exception {
+        mockMvc.perform(post(PATIENTS_API_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(malformedJson))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.INVALID_REQUEST_BODY_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.INVALID_REQUEST_BODY_MESSAGE))
+                .andExpect(jsonPath("$.instance").value(PATIENTS_API_URL));
+
+        verifyNoInteractions(patientService);
     }
 
     @Test
-    void createPatientReturnsBadRequestForMalformedJson() throws Exception {
-        mockMvc.perform(post("/api/v1/patients")
+    void createPatientReturnsBadRequestForUnknownField() throws Exception {
+        String request = """
+            {
+              "name": "Anakin Skywalker",
+              "email": "anakin@jedi.com",
+              "address": "67 Mustafar Rd",
+              "dateOfBirth": "1980-09-18",
+              "unexpectedField": "value"
+            }
+            """;
+
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{ invalid json }"))
-                .andExpect(status().isBadRequest());
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.INVALID_REQUEST_BODY_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.INVALID_REQUEST_BODY_MESSAGE))
+                .andExpect(jsonPath("$.instance").value(PATIENTS_API_URL));
 
         verifyNoInteractions(patientService);
     }
 
     @Test
     void createPatientRejectsUnsupportedContentType() throws Exception {
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.TEXT_PLAIN)
                         .content("patient"))
-                .andExpect(status().isUnsupportedMediaType());
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.UNSUPPORTED_MEDIA_TYPE_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.UNSUPPORTED_MEDIA_TYPE_MESSAGE))
+                .andExpect(jsonPath("$.instance").value(PATIENTS_API_URL));
 
         verifyNoInteractions(patientService);
     }
@@ -212,11 +292,19 @@ class PatientControllerTest {
     void createPatientReturnsBadRequestForFutureDateOfBirth(LocalDate dateOfBirth) throws Exception {
         PatientRequestDTO request = createPatientRequestWithDateOfBirth(dateOfBirth);
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.dateOfBirth").value("Date of birth cannot be in the future"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title").value(ErrorMessages.VALIDATION_FAILED_TITLE))
+                .andExpect(jsonPath("$.detail").value(ErrorMessages.VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.instance").value(PATIENTS_API_URL))
+                .andExpect(jsonPath("$.errors.dateOfBirth")
+                        .value("Date of birth cannot be in the future"));
+
+        verifyNoInteractions(patientService);
     }
 
     @Test
@@ -225,31 +313,44 @@ class PatientControllerTest {
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
 
         PatientRequestDTO request = createPatientRequestWithDateOfBirth(today);
-        PatientResponseDTO response = createPatientResponse(id);
+        PatientResponseDTO response = createPatientResponseFromRequest(id, request);
 
-        when(patientService.createPatient(any(PatientRequestDTO.class)))
-                .thenReturn(response);
+        when(patientService.createPatient(request)).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        PATIENTS_API_URL + "/" + id
+                ))
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.dateOfBirth").value(today.toString()));
+
+        verify(patientService).createPatient(request);
     }
 
     @Test
     void createPatientReturnsConflictWhenEmailAlreadyExists() throws Exception {
         PatientRequestDTO request = createPatientRequest();
 
-        when(patientService.createPatient(any(PatientRequestDTO.class)))
-                .thenThrow(new EmailAlreadyExistsException(
-                        "A patient with this email already exists"
-                ));
+        when(patientService.createPatient(request))
+                .thenThrow(new EmailAlreadyExistsException("A patient with this email already exists"));
 
-        mockMvc.perform(post("/api/v1/patients")
+        mockMvc.perform(post(PATIENTS_API_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.EMAIL_ALREADY_EXISTS_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("A patient with this email already exists"))
+                .andExpect(jsonPath("$.instance").value(PATIENTS_API_URL));
+
+        verify(patientService).createPatient(request);
     }
 
     // =========================================================================
@@ -260,92 +361,125 @@ class PatientControllerTest {
         UUID id = UUID.randomUUID();
 
         PatientRequestDTO request = createPatientRequest();
-        PatientResponseDTO response = createPatientResponse(id);
 
-        when(patientService.updatePatient(
-                eq(id),
-                any(PatientRequestDTO.class)
-        )).thenReturn(response);
+        PatientResponseDTO response = new PatientResponseDTO(
+                id.toString(),
+                request.name(),
+                request.email(),
+                request.address(),
+                request.dateOfBirth().toString()
+        );
 
-        mockMvc.perform(put("/api/v1/patients/{id}", id)
+        when(patientService.updatePatient(id, request)).thenReturn(response);
+
+        mockMvc.perform(put(PATIENTS_API_URL + "/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()))
-                .andExpect(jsonPath("$.name").value(response.name()))
-                .andExpect(jsonPath("$.email").value(response.email()))
-                .andExpect(jsonPath("$.address").value(response.address()))
-                .andExpect(jsonPath("$.dateOfBirth").value(response.dateOfBirth()));
+                .andExpect(jsonPath("$.name").value(request.name()))
+                .andExpect(jsonPath("$.email").value(request.email()))
+                .andExpect(jsonPath("$.address").value(request.address()))
+                .andExpect(jsonPath("$.dateOfBirth")
+                        .value(request.dateOfBirth().toString()));
 
-        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+        verify(patientService).updatePatient(id, request);
     }
 
     @Test
     void updatePatientReturnsBadRequestForInvalidRequest() throws Exception {
-
         UUID id = UUID.randomUUID();
-        PatientRequestDTO request = new PatientRequestDTO("", "", "", null);
 
-        mockMvc.perform(put("/api/v1/patients/{id}", id)
+        PatientRequestDTO request = new PatientRequestDTO(
+                "",
+                "invalid-email",
+                "",
+                null
+        );
+
+        mockMvc.perform(put(PATIENTS_API_URL + "/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.name").value("Name is required"))
-                .andExpect(jsonPath("$.email").value("Email is required"))
-                .andExpect(jsonPath("$.address").value("Address is required"))
-                .andExpect(jsonPath("$.dateOfBirth").value("Date of birth is required"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.VALIDATION_FAILED_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value(ErrorMessages.VALIDATION_FAILED_MESSAGE))
+                .andExpect(jsonPath("$.errors.name").exists())
+                .andExpect(jsonPath("$.errors.email").exists())
+                .andExpect(jsonPath("$.errors.address").exists())
+                .andExpect(jsonPath("$.errors.dateOfBirth").exists());
 
         verifyNoInteractions(patientService);
     }
 
     @Test
     void updatePatientReturnsNotFoundWhenPatientDoesNotExist() throws Exception {
-
         UUID id = UUID.randomUUID();
         PatientRequestDTO request = createPatientRequest();
 
-        when(patientService.updatePatient(
-                eq(id),
-                any(PatientRequestDTO.class)
-        )).thenThrow(new PatientNotFoundException("Patient not found with id " + id));
+        when(patientService.updatePatient(id, request))
+                .thenThrow(new PatientNotFoundException("Patient not found with id " + id));
 
-        mockMvc.perform(put("/api/v1/patients/{id}", id)
+        mockMvc.perform(put(PATIENTS_API_URL + "/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.PATIENT_NOT_FOUND_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Patient not found with id " + id))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/" + id));
 
-        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+        verify(patientService).updatePatient(id, request);
     }
 
     @Test
-    void updatePatientReturnsConflictWhenEmailBelongsToAnotherPatient() throws Exception {
-
+    void updatePatientReturnsConflictWhenEmailAlreadyExists() throws Exception {
         UUID id = UUID.randomUUID();
+
         PatientRequestDTO request = createPatientRequest();
 
-        when(patientService.updatePatient(
-                eq(id),
-                any(PatientRequestDTO.class)
-        )).thenThrow(new EmailAlreadyExistsException("A patient with this email already exists"));
+        when(patientService.updatePatient(id, request))
+                .thenThrow(new EmailAlreadyExistsException("A patient with this email already exists"));
 
-        mockMvc.perform(put("/api/v1/patients/{id}", id)
+        mockMvc.perform(put(PATIENTS_API_URL + "/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.EMAIL_ALREADY_EXISTS_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("A patient with this email already exists"))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/" + id));
 
-        verify(patientService).updatePatient(eq(id), any(PatientRequestDTO.class));
+        verify(patientService).updatePatient(id, request);
     }
 
     @Test
     void updatePatientReturnsBadRequestForInvalidUuid() throws Exception {
-
         PatientRequestDTO request = createPatientRequest();
 
-        mockMvc.perform(put("/api/v1/patients/{id}", "not-a-uuid")
+        mockMvc.perform(put(PATIENTS_API_URL + "/{id}", "not-a-uuid")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.INVALID_PARAMETER_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Invalid value for parameter 'id'"))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/not-a-uuid"));
 
         verifyNoInteractions(patientService);
     }
@@ -357,8 +491,11 @@ class PatientControllerTest {
     void deletePatientByIdReturnsNoContent() throws Exception {
         UUID id = UUID.randomUUID();
 
-        mockMvc.perform(delete("/api/v1/patients/{id}", id))
-                .andExpect(status().isNoContent());
+        doNothing().when(patientService).deletePatientById(id);
+
+        mockMvc.perform(delete(PATIENTS_API_URL + "/{id}", id))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
 
         verify(patientService).deletePatientById(id);
     }
@@ -370,8 +507,16 @@ class PatientControllerTest {
         doThrow(new PatientNotFoundException("Patient not found with id " + id))
                 .when(patientService).deletePatientById(id);
 
-        mockMvc.perform(delete("/api/v1/patients/{id}", id))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(delete(PATIENTS_API_URL + "/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.PATIENT_NOT_FOUND_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Patient not found with id " + id))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/" + id));
 
         verify(patientService).deletePatientById(id);
     }
@@ -379,19 +524,30 @@ class PatientControllerTest {
     @Test
     void deletePatientByIdReturnsBadRequestForInvalidUuid() throws Exception {
 
-        mockMvc.perform(delete("/api/v1/patients/{id}", "not-a-uuid"))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(delete(PATIENTS_API_URL + "/{id}", "not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.title")
+                        .value(ErrorMessages.INVALID_PARAMETER_TITLE))
+                .andExpect(jsonPath("$.detail")
+                        .value("Invalid value for parameter 'id'"))
+                .andExpect(jsonPath("$.instance")
+                        .value(PATIENTS_API_URL + "/not-a-uuid"));
 
         verifyNoInteractions(patientService);
     }
 
     // =========================================================================
-    // HELPER METHODS
+    // HELPER METHODS & CONSTANTS
     // =========================================================================
+
+    private static final String PATIENTS_API_URL = "/api/v1/patients";
+
     private PatientRequestDTO createPatientRequest() {
         return new PatientRequestDTO(
                 "Jon Snow",
-                "jon@example.com",
+                "jon@knownothing.com",
                 "21 Jump St",
                 LocalDate.of(1990, Month.JANUARY, 1)
         );
@@ -399,18 +555,18 @@ class PatientControllerTest {
 
     private PatientRequestDTO createPatientRequestWithEmail(String email) {
         return new PatientRequestDTO(
-                "Jon Snow",
+                "Katniss Everdeen",
                 email,
-                "21 Jump St",
+                "District 12 Blvd",
                 LocalDate.of(1990, Month.JANUARY, 1)
         );
     }
 
     private PatientRequestDTO createPatientRequestWithDateOfBirth(LocalDate dateOfBirth) {
         return new PatientRequestDTO(
-                "Jon Snow",
-                "jon@example.com",
-                "21 Jump St",
+                "Avatar Aang",
+                "aang@avatar.com",
+                "Air Temple Rd",
                 dateOfBirth
         );
     }
@@ -418,10 +574,20 @@ class PatientControllerTest {
     private PatientResponseDTO createPatientResponse(UUID id) {
         return new PatientResponseDTO(
                 id.toString(),
-                "Jon Snow",
-                "jon@example.com",
-                "21 Jump St",
-                "1990-01-01"
+                "Spongebob Squarepants",
+                "spongebob@krustykrab.com",
+                "124 Conch Street, Bikini Bottom, Pacific Ocean",
+                "1986-07-14"
+        );
+    }
+
+    private PatientResponseDTO createPatientResponseFromRequest(UUID id, PatientRequestDTO request) {
+        return new PatientResponseDTO(
+                id.toString(),
+                request.name(),
+                request.email(),
+                request.address(),
+                request.dateOfBirth().toString()
         );
     }
 
@@ -432,6 +598,27 @@ class PatientControllerTest {
                 today.plusDays(1),
                 today.plusMonths(1),
                 today.plusYears(10)
+        );
+    }
+
+    private static Stream<String> getMalformedJson() {
+        return Stream.of(
+                "{ Dirty Diana }",
+                """
+                {
+                  "name": "Michael Jackson",
+                  "email": "michael@kingofpop.com",
+                  "address": "1 Thriller St",
+                  "dateOfBirth": "1958-08-29"
+                """,
+                """
+                {
+                  "name": "Billie Jean"
+                  "email": "billie@notmylover.com"
+                  "address": "123 Rainbow Rd"
+                  "dateOfBirth": "1960-05-19"
+                }
+                """
         );
     }
 }

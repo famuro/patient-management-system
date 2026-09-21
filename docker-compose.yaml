@@ -17,7 +17,8 @@ services:
 
   patient-service:
     build:
-      context: ./patient-service
+      context: .
+      dockerfile: patient-service/Dockerfile
     image: patient-management-system/patient-service:local
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://patient-db:5432/patient_db
