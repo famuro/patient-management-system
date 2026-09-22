@@ -4,9 +4,12 @@ import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
+import io.github.famuro.patientsystem.patient.grpc.GrpcBillingClient;
 import io.github.famuro.patientsystem.patient.mapper.PatientMapper;
 import io.github.famuro.patientsystem.patient.model.Patient;
 import io.github.famuro.patientsystem.patient.repository.PatientRepository;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,23 +27,40 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
+/**
+ * Unit tests for PatientService.
+ *
+ * <p>Repository and downstream service dependencies are mocked so these tests
+ * focus on PatientService business logic in isolation.
+ *
+ * <p>In particular, GrpcBillingClient is mocked here; the real protobuf messages,
+ * generated gRPC stub, and transport behavior are covered separately by integration tests.
+ */
 @ExtendWith(MockitoExtension.class)
 class PatientServiceTest {
 
     @Mock
     private PatientRepository patientRepository;
 
+    @Mock
+    private GrpcBillingClient grpcBillingClient;
+
     private PatientService patientService;
 
     @BeforeEach
     void setUp() {
         PatientMapper patientMapper = new PatientMapper();
-        patientService = new PatientService(patientRepository, patientMapper);
+        patientService = new PatientService(patientRepository, patientMapper, grpcBillingClient);
     }
 
     // =========================================================================
     // CREATE TESTS
     // =========================================================================
+
+    /**
+     * Verifies that creating a patient persists the patient, returns the mapped
+     * response, and requests creation of the corresponding Billing account.
+     */
     @Test
     void createPatientSavesAndReturnsPatient() {
         PatientRequestDTO request = createPatientRequest();
@@ -67,6 +87,7 @@ class PatientServiceTest {
 
         verify(patientRepository).existsByEmail(request.email());
         verify(patientRepository).save(any(Patient.class));
+        verify(grpcBillingClient).createBillingAccount(id.toString(), request.name(), request.email());
     }
 
     @Test
@@ -77,15 +98,61 @@ class PatientServiceTest {
 
         EmailAlreadyExistsException exception = assertThrows(
                 EmailAlreadyExistsException.class,
-                () -> patientService.createPatient(request));
-
-        assertEquals(
-                "A patient with this email already exists",
-                exception.getMessage()
+                () -> patientService.createPatient(request)
         );
+
+        assertEquals("A patient with this email already exists", exception.getMessage());
 
         verify(patientRepository).existsByEmail(request.email());
         verify(patientRepository, never()).save(any());
+        verifyNoInteractions(grpcBillingClient);
+    }
+
+    /**
+     * Verifies the current behavior when Billing account creation fails.
+     *
+     * <p>After the patient is persisted, PatientService makes a synchronous gRPC
+     * call to create the corresponding Billing account. If that call fails, the
+     * gRPC exception currently propagates to the caller rather than being swallowed
+     * or converted by PatientService.
+     *
+     * <p>This test documents the current distributed-service behavior and can be
+     * updated later if retries, compensation, or asynchronous event-driven account
+     * creation are introduced.
+     */
+    @Test
+    void createPatientPropagatesBillingFailure() {
+        PatientRequestDTO request = createPatientRequest();
+        Patient savedPatient = mock(Patient.class);
+        UUID id = UUID.randomUUID();
+
+        when(patientRepository.existsByEmail(request.email())).thenReturn(false);
+        when(patientRepository.save(any(Patient.class))).thenReturn(savedPatient);
+
+        when(savedPatient.getId()).thenReturn(id);
+        when(savedPatient.getName()).thenReturn(request.name());
+        when(savedPatient.getEmail()).thenReturn(request.email());
+
+        doThrow(new StatusRuntimeException(Status.UNAVAILABLE))
+                .when(grpcBillingClient)
+                .createBillingAccount(
+                        id.toString(),
+                        request.name(),
+                        request.email()
+                );
+
+        assertThrows(
+                StatusRuntimeException.class,
+                () -> patientService.createPatient(request)
+        );
+
+        verify(patientRepository).save(any(Patient.class));
+
+        verify(grpcBillingClient).createBillingAccount(
+                id.toString(),
+                request.name(),
+                request.email()
+        );
     }
 
     // =========================================================================

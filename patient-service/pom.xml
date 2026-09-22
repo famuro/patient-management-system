@@ -105,6 +105,12 @@
             <artifactId>grpc-netty-shaded</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-grpc-client-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Shared generated protobuf and gRPC contract -->
         <dependency>
             <groupId>${project.groupId}</groupId>
