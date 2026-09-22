@@ -26,6 +26,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${PATIENT_POSTGRES_PASSWORD}
       SPRING_H2_CONSOLE_ENABLED: "false"
       SPRING_JPA_DDL_AUTO: update
+      SPRING_GRPC_CLIENT_CHANNEL_BILLING_TARGET: static://billing-service:9090
     ports:
       - "4000:4000"
     depends_on:
