@@ -4,6 +4,7 @@ import io.github.famuro.patientsystem.patient.dto.v1.PatientRequestDTO;
 import io.github.famuro.patientsystem.patient.dto.v1.PatientResponseDTO;
 import io.github.famuro.patientsystem.patient.exception.EmailAlreadyExistsException;
 import io.github.famuro.patientsystem.patient.exception.PatientNotFoundException;
+import io.github.famuro.patientsystem.patient.grpc.GrpcBillingClient;
 import io.github.famuro.patientsystem.patient.mapper.PatientMapper;
 import io.github.famuro.patientsystem.patient.model.Patient;
 import io.github.famuro.patientsystem.patient.repository.PatientRepository;
@@ -16,10 +17,14 @@ import java.util.UUID;
 public class PatientService {
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
+    private final GrpcBillingClient grpcBillingClient;
 
-    public PatientService(PatientRepository patientRepository, PatientMapper patientMapper) {
+    public PatientService(PatientRepository patientRepository,
+                          PatientMapper patientMapper,
+                          GrpcBillingClient grpcBillingClient) {
         this.patientRepository = patientRepository;
         this.patientMapper = patientMapper;
+        this.grpcBillingClient = grpcBillingClient;
     }
 
     public List<PatientResponseDTO> getPatients() {
@@ -40,7 +45,14 @@ public class PatientService {
             throw new EmailAlreadyExistsException("A patient with this email already exists");
         }
 
-        Patient newPatient = patientRepository.save(patientMapper.toModel(patientRequestDTO));
+        Patient patientDetails = patientMapper.toModel(patientRequestDTO);
+        Patient newPatient = patientRepository.save(patientDetails);
+
+        grpcBillingClient.createBillingAccount(
+                newPatient.getId().toString(),
+                newPatient.getName(),
+                newPatient.getEmail()
+        );
 
         return patientMapper.toDTO(newPatient);
     }

@@ -21,7 +21,10 @@ RUN mvn --batch-mode --no-transfer-progress \
     -am \
     dependency:go-offline
 
-# Copy only the Patient Service source required for this image build.
+# Copy the shared gRPC contract source and the Patient Service source.
+# Patient depends on the generated Billing contract classes, so the
+# protobuf contract must be available during the reactor build.
+COPY contracts/billing-contract/src contracts/billing-contract/src
 COPY patient-service/src patient-service/src
 
 # Build the Patient Service from the root Maven reactor.
