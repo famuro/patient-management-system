@@ -1,100 +1,117 @@
 # Patient Management System
 
-A microservices-based patient management platform built with Spring Boot.
+A production-oriented microservices backend built with **Java 21** and **Spring Boot 4**.
 
-The project is designed to demonstrate the architecture and development of a production-style distributed system using independently deployable services, synchronous and asynchronous service communication, authentication, event-driven processing, and modern deployment practices.
+The project demonstrates the incremental development of a distributed system using REST APIs, gRPC service communication, PostgreSQL, Docker, automated testing, and CI/CD.
 
-> **Status:** Initial development
-
-## Overview
-
-The Patient Management System will consist of several independently deployable services responsible for distinct areas of the application.
-
-Planned services include:
-
-* **Patient Service** — manages patient information and patient-related operations.
-* **Auth Service** — handles authentication and authorization.
-* **Billing Service** — manages billing-related operations.
-* **Analytics Service** — processes application events for reporting and analytics.
-* **Notification Service** — handles application notifications.
-* **API Gateway** — provides a centralized entry point for external API requests.
+> **Status:** Active development
 
 ## Architecture
 
-The application will follow a microservices architecture with service boundaries based on business responsibilities.
-
-Planned communication patterns include:
-
-* REST APIs for external client communication
-* gRPC for synchronous internal communication between the Patient and Billing services
-* Apache Kafka for asynchronous event-driven communication between services
-* An API Gateway for routing and centralized request handling
-
-Each service will be designed to remain independently buildable, testable, and deployable.
-
-## Technology Stack
 Currently implemented:
 
-- Spring Boot + Spring Data JPA
-- Maven
-- JUnit + Mockito
-- PostgreSQL
-- GitHub Actions
-- Docker + Compose
-- OpenAPI / Swagger UI / Scalar
+```text
+Client
+  |
+  | REST
+  v
+Patient Service --> PostgreSQL
+  |
+  | gRPC
+  v
+Billing Service
+```
 
-Planned as the system expands:
+When a patient is created, the Patient Service persists the patient and synchronously requests creation of a corresponding Billing account over gRPC.
 
-- Spring Security
-- Spring Cloud Gateway
-- gRPC
-- Apache Kafka
+A shared Protocol Buffers module defines the contract between the two services.
 
-Additional infrastructure, observability, testing, and deployment tooling will be introduced as the project evolves.
+### Current Services
+
+* **Patient Service** — REST API for patient management
+* **Billing Service** — internal gRPC service for billing account creation
+* **Billing Contract** — shared protobuf/gRPC contract
+
+Planned:
+
+* Auth Service
+* API Gateway
+* Analytics Service
+* Notification Service
+* Apache Kafka for event-driven communication
+
+## Tech Stack
+
+**Backend**
+
+* Java 21
+* Spring Boot 4
+* Spring Web MVC
+* Spring Data JPA
+* Spring gRPC
+* Protocol Buffers
+
+**Data**
+
+* PostgreSQL
+
+**Testing**
+
+* JUnit 5
+* Mockito
+* MockMvc
+* Spring Boot integration tests
+* in-process gRPC integration testing
+
+**Infrastructure**
+
+* Maven multi-module build
+* Docker + Compose
+* GitHub Actions
+
+**API Documentation**
+
+* OpenAPI
+* Swagger UI
+* Scalar
 
 ## Repository Structure
 
-This project uses a monorepo containing independently deployable microservices.
-
 ```text
 patient-management-system/
-├── api-gateway/
-├── auth-service/
+├── .github/
+│   └── workflows/
+├── contracts/
+│   └── billing-contract/
 ├── patient-service/
 ├── billing-service/
-├── analytics-service/
-├── notification-service/
-├── infrastructure/
-└── docs/
+├── docker-compose.yaml
+├── pom.xml
+└── README.md
 ```
 
-The repository structure will be expanded as services and supporting infrastructure are implemented.
+The project uses a Maven multi-module monorepo while keeping services independently deployable.
 
-## Development
-### Local Development with Docker
+## Patient API
 
-The Patient Service can be run locally with PostgreSQL using Docker Compose.
+| Method   | Endpoint                | Description           |
+| -------- | ----------------------- | --------------------- |
+| `GET`    | `/api/v1/patients`      | Retrieve all patients |
+| `POST`   | `/api/v1/patients`      | Create a patient      |
+| `GET`    | `/api/v1/patients/{id}` | Retrieve a patient    |
+| `PUT`    | `/api/v1/patients/{id}` | Update a patient      |
+| `DELETE` | `/api/v1/patients/{id}` | Delete a patient      |
+
+REST errors use Spring `ProblemDetail` to provide a consistent RFC 9457-style error response.
+
+## Running Locally
 
 ### Prerequisites
 
 * Docker
 * Docker Compose
 
-### Environment Configuration
-
-Create a local `.env` file from the provided `.env.example` and configure the Patient Service database credentials.
-
-```env
-PATIENT_POSTGRES_DB=patient_db
-PATIENT_POSTGRES_USER=patient_user
-PATIENT_POSTGRES_PASSWORD=your-password
-```
-
-The `.env` file is excluded from version control.
-
-### Start the Application
-
-From the repository root, run:
+Create a local `.env` file from `.env.example`, then run:
 
 ```bash
 docker compose up --build
@@ -102,44 +119,91 @@ docker compose up --build
 
 This starts:
 
-* the Patient Service
-* a PostgreSQL database dedicated to the Patient Service
+* Patient Service
+* Billing Service
+* Patient PostgreSQL database
 
-The Patient Service is available at:
+Patient Service:
 
 ```text
 http://localhost:4000
 ```
 
-### Stop the Application
+Billing gRPC:
+
+```text
+localhost:9090
+```
+
+Stop the environment with:
 
 ```bash
 docker compose down
 ```
 
-PostgreSQL data is stored in a named Docker volume and persists between container restarts.
-To remove the containers and delete the local database volume:
+To also remove persisted PostgreSQL data:
 
 ```bash
 docker compose down -v
 ```
 
-> Running with `-v` permanently deletes the local PostgreSQL data stored by Docker Compose.
+## Building and Testing
 
+Run the complete Maven build:
+
+```bash
+./mvnw clean verify
+```
+
+Build and test a specific service with its required modules:
+
+```bash
+./mvnw -pl patient-service -am clean verify
+```
+
+```bash
+./mvnw -pl billing-service -am clean verify
+```
+
+GitHub Actions independently validates the services with Maven tests and Docker image builds.
 
 ## API Documentation
 
-The Patient Service includes OpenAPI documentation generated with Springdoc.
-When the service is running locally, interactive API documentation is available through Swagger UI:
+With the Patient Service running:
+
+**Swagger UI**
+
 ```text
-localhost:4000/swagger-ui.html
+http://localhost:4000/swagger-ui.html
 ```
-or through Scalar:
+
+**Scalar**
+
 ```text
-localhost:4000/scalar
+http://localhost:4000/scalar
 ```
-The documentation includes the available patient endpoints, request operations, and API descriptions defined alongside the controller implementation. 
-OpenAPI annotations are maintained with the application code so that the API documentation evolves with the service.
+
+## Documentation
+
+Additional design and implementation details:
+
+* [Architecture](docs/architecture.md)
+* [gRPC Communication](docs/grpc.md)
+* [Testing Strategy](docs/testing.md)
+* [Local Development](docs/local-development.md)
+* [Roadmap](docs/roadmap.md)
+
+## Roadmap
+
+Next major areas of development include:
+
+* Apache Kafka and event-driven communication
+* authentication and authorization
+* API Gateway
+* Analytics and Notification services
+* Billing persistence
+* resilience and observability
+* Kubernetes deployment
 
 ## License
 
