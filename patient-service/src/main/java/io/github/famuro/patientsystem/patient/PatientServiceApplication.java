@@ -5,6 +5,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.grpc.client.ImportGrpcClients;
 
+/**
+ * Entry point for the Patient Service application.
+ *
+ * <p>Bootstraps the Spring application and registers the Billing gRPC client.
+ */
 @SpringBootApplication
 @ImportGrpcClients(target = "billing", types = BillingServiceGrpc.BillingServiceBlockingStub.class)
 public class PatientServiceApplication {
