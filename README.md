@@ -108,14 +108,20 @@ REST errors use Spring `ProblemDetail` to provide a consistent RFC 9457-style er
 
 ### Prerequisites
 
-* Docker
-* Docker Compose
+- Java 21
+- Docker
+- Docker Compose
+- Make
 
-Create a local `.env` file from `.env.example`, then run:
+The repository includes the Maven Wrapper, so a local Maven installation is not required.
+
+### Quick Start
+
+Build and start the local environment:
 
 ```bash
-docker compose up --build
-```
+make up-build
+````
 
 This starts:
 
@@ -138,31 +144,49 @@ localhost:9090
 Stop the environment with:
 
 ```bash
-docker compose down
+make down
 ```
 
 To also remove persisted PostgreSQL data:
 
 ```bash
-docker compose down -v
+make down-volumes
+```
+
+To follow service logs:
+
+```bash
+make logs
+```
+
+To view all available development commands:
+
+```bash
+make help
 ```
 
 ## Building and Testing
 
-Run the complete Maven build:
+Run the complete Maven build and tests:
 
 ```bash
-./mvnw clean verify
+make build
+```
+
+Run all tests:
+
+```bash
+make test
 ```
 
 Build and test a specific service with its required modules:
 
 ```bash
-./mvnw -pl patient-service -am clean verify
+make verify-patient
 ```
 
 ```bash
-./mvnw -pl billing-service -am clean verify
+make verify-billing
 ```
 
 GitHub Actions independently validates the services with Maven tests and Docker image builds.

@@ -2,9 +2,21 @@
 
 ## Overview
 
-The project supports both Maven-based development and a Docker Compose environment for running multiple services together.
-
+The project supports both Maven-based development and a Docker Compose.
 Commands in this document should be run from the repository root unless otherwise noted.
+
+A [Makefile](../Makefile) is provided for common development operations like
+environment setup, Maven builds, tests, and Docker Compose operations.
+
+The underlying Maven and Docker commands can still be run directly when finer control is needed.
+
+Run:
+
+```bash
+make help
+```
+
+to view the available development commands.
 
 ## Prerequisites
 
@@ -13,18 +25,33 @@ Install:
 * Java 21
 * Docker
 * Docker Compose
+* Make
 
 A local Maven installation is not required because the repository includes the Maven Wrapper.
 
 ## Environment Configuration
 
-Copy the example environment file:
+The project uses a local `.env` file for Docker Compose configuration.
+
+Create it with:
 
 ```bash
-cp .env.example .env
+make env
 ```
 
-Configure the required local values in `.env`.
+If `.env` does not exist, the command copies `.env.example` to `.env`.
+
+If `.env` already exists, it is left unchanged.
+
+You can also prepare the repository with:
+
+```bash
+make setup
+```
+
+which creates `.env` if needed and ensures the Maven Wrapper is executable.
+
+Review `.env` before starting the application and update any local values as needed.
 
 For example:
 
@@ -36,41 +63,65 @@ PATIENT_POSTGRES_PASSWORD=your-password
 
 The `.env` file is excluded from version control.
 
-A Makefile is also provided for common development commands, including environment setup.
-
 ## Build the Project
 
 Build and verify all current Maven modules:
 
 ```bash
-./mvnw clean verify
+make build
 ```
 
-## Build a Specific Service
+This performs a clean Maven build and runs the full verification lifecycle.
+
+For a faster test run without a clean build:
+
+```bash
+make test
+```
+
+To package the project without running tests:
+
+```bash
+make package
+```
+
+### Build or Test a Specific Service
 
 Patient Service:
 
 ```bash
-./mvnw -pl patient-service -am clean verify
+make verify-patient
 ```
 
 Billing Service:
 
 ```bash
-./mvnw -pl billing-service -am clean verify
+make verify-billing
 ```
 
-`-am` builds any reactor modules required by the selected service, including shared contracts.
-
-## Docker Compose
-
-Start the local multi-service environment:
+For faster service-specific test runs:
 
 ```bash
-docker compose up --build
+make test-patient
 ```
 
-The current environment includes:
+```bash
+make test-billing
+```
+
+These commands automatically include any required Maven reactor dependencies, such as shared contract modules.
+
+## Start the Application
+
+Build the service images and start the Docker Compose environment:
+
+```bash
+make up-build
+```
+
+This also creates `.env` from `.env.example` if the file does not already exist.
+
+The current local environment includes:
 
 * Patient Service
 * Billing Service
@@ -96,45 +147,71 @@ Billing gRPC from the host:
 localhost:9090
 ```
 
-Inside Docker Compose, services communicate using Compose service names rather than `localhost`.
+### Start Without Rebuilding
 
-## Stop the Environment
-
-Stop containers:
+If the Docker images are already built and no rebuild is needed:
 
 ```bash
-docker compose down
+make up
 ```
 
-Remove containers and local persistent volumes:
+### View Running Services
 
 ```bash
-docker compose down -v
+make ps
 ```
 
-> `docker compose down -v` permanently deletes data stored in the Compose-managed database volumes.
+### View Logs
 
-## Building Docker Images Directly
-
-Docker builds use the repository root as their build context because services participate in the root Maven reactor and may depend on shared modules.
-
-### Patient Service
+Follow logs from all Compose services:
 
 ```bash
-docker build \
-  --file patient-service/Dockerfile \
-  --tag patient-management-system/patient-service:local \
-  .
+make logs
 ```
 
-### Billing Service
+### Restart the Application
 
 ```bash
-docker build \
-  --file billing-service/Dockerfile \
-  --tag patient-management-system/billing-service:local \
-  .
+make restart
 ```
+
+## Stop the Application
+
+Stop and remove the Compose containers:
+
+```bash
+make down
+```
+
+To also remove Docker volumes:
+
+```bash
+make down-volumes
+```
+
+> `make down-volumes` permanently deletes data stored in Compose-managed volumes, including local PostgreSQL data.
+
+## Build Docker Images Directly
+
+Build all service images:
+
+```bash
+make docker-build
+```
+
+Build only the Patient Service image:
+
+```bash
+make docker-build-patient
+```
+
+Build only the Billing Service image:
+
+```bash
+make docker-build-billing
+```
+
+Docker builds use the repository root as the build context because services participate in the root Maven reactor and may depend on shared modules.
 
 ## API Documentation
 
@@ -154,41 +231,56 @@ http://localhost:4000/scalar
 
 ## Common Development Workflow
 
-A typical workflow is:
+A typical development workflow is:
 
 ```text
 1. Create or switch to a feature branch
 2. Make the application changes
 3. Run targeted tests during development
-4. Run ./mvnw clean verify
-5. Build or run the affected services with Docker
+4. Run make build before opening a pull request
+5. Run make up-build when local multi-service validation is needed
 6. Smoke-test the relevant service interaction
 7. Commit and open a pull request
 ```
 
-## Makefile
+## Direct Maven and Docker Commands
 
-The repository Makefile provides shorter commands for common development tasks.
+The Makefile is a convenience layer only. Maven and Docker Compose remain the underlying tools.
 
-It is intended as a convenience layer over Maven and Docker rather than a replacement for them.
+Equivalent commands can be run directly when needed.
 
-The Makefile may include targets for tasks such as:
-
-```text
-make setup
-make build
-make test
-make up
-make down
-make clean
-```
-
-Run:
+Full Maven verification:
 
 ```bash
-make help
+./mvnw clean verify
 ```
 
-for the authoritative list of available targets once the Makefile is present.
+Verify Patient Service and its required modules:
 
-As additional services are added, the Makefile can expose service-specific targets without requiring developers to remember increasingly long Maven or Docker commands.
+```bash
+./mvnw \
+  -pl patient-service \
+  -am \
+  clean verify
+```
+
+Verify Billing Service and its required modules:
+
+```bash
+./mvnw \
+  -pl billing-service \
+  -am \
+  clean verify
+```
+
+Start the Docker Compose environment:
+
+```bash
+docker compose up --build
+```
+
+Stop the Docker Compose environment:
+
+```bash
+docker compose down
+```
