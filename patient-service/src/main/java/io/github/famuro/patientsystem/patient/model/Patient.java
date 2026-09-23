@@ -11,6 +11,9 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/**
+ * Persistence entity representing a patient.
+ */
 @Entity
 public class Patient {
     @Id
@@ -31,6 +34,9 @@ public class Patient {
     @NotNull
     private LocalDate dateOfBirth;
 
+    /**
+     * Date the patient was registered automatically by the system.
+     */
     @NotNull
     private LocalDate registeredDate;
 
